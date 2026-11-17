@@ -36,6 +36,13 @@
         // 2. AUTH & USER MANAGEMENT
         // ============================================================
         const PROFILE_PHOTO_KEY = 'NIK_GAS_LPG_PROFILE_PHOTO_V1';
+        const PROFILE_PHOTO_SIZE = 512;
+        let profileCropImage = null;
+        let profileCropObjectUrl = null;
+        let profileCropZoom = 1;
+        let profileCropOffsetX = 0;
+        let profileCropOffsetY = 0;
+        let profileCropDrag = null;
         const supabaseConfig = window.NIK_GAS_LPG_SUPABASE_CONFIG;
         const supabaseClient = window.supabase && supabaseConfig
             ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
@@ -194,23 +201,165 @@
         }
 
         function uploadProfilePhoto(event) {
-            const file = event.target.files[0];
+            const input = event.currentTarget;
+            const file = input.files && input.files[0];
+            input.value = '';
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                if (typeof ev.target.result !== 'string') {
-                    showNotification('Foto profil gagal dibaca.');
-                    return;
-                }
-                localStorage.setItem(PROFILE_PHOTO_KEY, ev.target.result);
-                document.getElementById('profile-photo').src = ev.target.result;
-                showNotification('Foto profil disimpan di browser ini saja.');
+            if (file.type && !file.type.startsWith('image/')) {
+                showNotification('Pilih file gambar untuk foto profil.');
+                return;
+            }
+            if (file.size > 20 * 1024 * 1024) {
+                showNotification('Ukuran foto maksimal 20 MB.');
+                return;
+            }
+
+            releaseProfileCropImage();
+            const objectUrl = URL.createObjectURL(file);
+            const image = new Image();
+            image.onload = () => {
+                profileCropImage = image;
+                profileCropObjectUrl = objectUrl;
+                profileCropZoom = 1;
+                profileCropOffsetX = 0;
+                profileCropOffsetY = 0;
+                document.getElementById('profile-crop-zoom').value = '1';
+                document.getElementById('profile-crop-image').src = objectUrl;
+                document.getElementById('profile-crop-modal').classList.remove('hidden');
+                requestAnimationFrame(updateProfileCropPreview);
             };
-            reader.onerror = () => showNotification('Foto profil gagal dibaca.');
-            reader.readAsDataURL(file);
+            image.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                showNotification('Foto tidak bisa dibuka. Coba pilih gambar JPG atau PNG.');
+            };
+            image.src = objectUrl;
+        }
+
+        function updateProfileCropPreview() {
+            if (!profileCropImage) return;
+            const viewport = document.getElementById('profile-crop-viewport');
+            const preview = document.getElementById('profile-crop-image');
+            const size = viewport.clientWidth;
+            if (!size) return;
+
+            const scale = Math.max(
+                size / profileCropImage.naturalWidth,
+                size / profileCropImage.naturalHeight
+            ) * profileCropZoom;
+            const width = profileCropImage.naturalWidth * scale;
+            const height = profileCropImage.naturalHeight * scale;
+            const maxOffsetX = Math.max(0, (width - size) / 2);
+            const maxOffsetY = Math.max(0, (height - size) / 2);
+            profileCropOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, profileCropOffsetX));
+            profileCropOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, profileCropOffsetY));
+
+            preview.style.width = `${width}px`;
+            preview.style.height = `${height}px`;
+            preview.style.left = `${(size - width) / 2 + profileCropOffsetX}px`;
+            preview.style.top = `${(size - height) / 2 + profileCropOffsetY}px`;
+        }
+
+        function startProfileCropDrag(event) {
+            if (!profileCropImage) return;
+            event.preventDefault();
+            profileCropDrag = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                offsetX: profileCropOffsetX,
+                offsetY: profileCropOffsetY
+            };
+            event.currentTarget.setPointerCapture(event.pointerId);
+        }
+
+        function moveProfileCropDrag(event) {
+            if (!profileCropDrag || event.pointerId !== profileCropDrag.pointerId) return;
+            profileCropOffsetX = profileCropDrag.offsetX + event.clientX - profileCropDrag.startX;
+            profileCropOffsetY = profileCropDrag.offsetY + event.clientY - profileCropDrag.startY;
+            updateProfileCropPreview();
+        }
+
+        function endProfileCropDrag(event) {
+            if (profileCropDrag && event.pointerId === profileCropDrag.pointerId) {
+                profileCropDrag = null;
+            }
+        }
+
+        function releaseProfileCropImage() {
+            if (profileCropObjectUrl) URL.revokeObjectURL(profileCropObjectUrl);
+            profileCropObjectUrl = null;
+            profileCropImage = null;
+            profileCropDrag = null;
+            const preview = document.getElementById('profile-crop-image');
+            preview.removeAttribute('src');
+            preview.removeAttribute('style');
+        }
+
+        function cancelProfileCrop() {
+            document.getElementById('profile-crop-modal').classList.add('hidden');
+            releaseProfileCropImage();
+        }
+
+        function saveProfileCrop() {
+            if (!profileCropImage) return;
+            updateProfileCropPreview();
+            const viewport = document.getElementById('profile-crop-viewport');
+            const preview = document.getElementById('profile-crop-image');
+            const size = viewport.clientWidth;
+            const width = Number.parseFloat(preview.style.width);
+            const height = Number.parseFloat(preview.style.height);
+            const left = Number.parseFloat(preview.style.left);
+            const top = Number.parseFloat(preview.style.top);
+            if (!size || !width || !height || !Number.isFinite(left) || !Number.isFinite(top)) {
+                showNotification('Area potong foto belum siap. Coba lagi.');
+                return;
+            }
+            const sourceWidth = size / width * profileCropImage.naturalWidth;
+            const sourceHeight = size / height * profileCropImage.naturalHeight;
+            const sourceX = Math.max(0, Math.min(
+                profileCropImage.naturalWidth - sourceWidth,
+                -left / width * profileCropImage.naturalWidth
+            ));
+            const sourceY = Math.max(0, Math.min(
+                profileCropImage.naturalHeight - sourceHeight,
+                -top / height * profileCropImage.naturalHeight
+            ));
+            const canvas = document.createElement('canvas');
+            canvas.width = PROFILE_PHOTO_SIZE;
+            canvas.height = PROFILE_PHOTO_SIZE;
+            const context = canvas.getContext('2d');
+            if (!context) {
+                showNotification('Foto gagal diproses di browser ini.');
+                return;
+            }
+
+            try {
+                context.drawImage(
+                    profileCropImage,
+                    sourceX,
+                    sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    0,
+                    0,
+                    PROFILE_PHOTO_SIZE,
+                    PROFILE_PHOTO_SIZE
+                );
+                const photoData = canvas.toDataURL('image/jpeg', 0.82);
+                localStorage.setItem(PROFILE_PHOTO_KEY, photoData);
+                document.getElementById('profile-photo').src = photoData;
+            } catch (error) {
+                console.error('Gagal memotong atau menyimpan foto profil:', error);
+                showNotification('Foto gagal disimpan. Coba gambar lain.');
+                return;
+            }
+
+            cancelProfileCrop();
+            showNotification('Foto profil disimpan di browser ini saja.');
         }
 
         function closeProfile() {
+            if (profileCropImage) cancelProfileCrop();
             document.getElementById('profile-modal').classList.add('hidden');
         }
         // 3. PENYIMPANAN DATA (AGAR TERSIMPAN PERMANEN)
@@ -727,6 +876,16 @@
                 document.getElementById('profile-modal').classList.remove('hidden');
             });
             document.getElementById('upload-photo').addEventListener('change', uploadProfilePhoto);
+            const profileCropViewport = document.getElementById('profile-crop-viewport');
+            profileCropViewport.addEventListener('pointerdown', startProfileCropDrag);
+            profileCropViewport.addEventListener('pointermove', moveProfileCropDrag);
+            profileCropViewport.addEventListener('pointerup', endProfileCropDrag);
+            profileCropViewport.addEventListener('pointercancel', endProfileCropDrag);
+            document.getElementById('profile-crop-zoom').addEventListener('input', event => {
+                profileCropZoom = Number(event.currentTarget.value);
+                updateProfileCropPreview();
+            });
+            window.addEventListener('resize', updateProfileCropPreview);
             document.getElementById('quick-add-btn').addEventListener('click', quickAddNikFromSearch);
 
             document.querySelectorAll('.btn, .quick-add-btn, .draft-toggle-btn, .info-dropdown-btn').forEach(btn => {
