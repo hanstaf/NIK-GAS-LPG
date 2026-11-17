@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NIK GAS LPG - UD. CHARLES</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- BACKGROUND GRADASI ATAS DENGAN GAMBAR -->
+    <div class="top-gradient-bg"></div>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-title">UD. CHARLES</div>
+            <div id="login-form">
+                <input type="email" id="login-identifier" class="auth-input" placeholder="Email" autocomplete="username">
+                <div class="auth-password-field">
+                    <input type="password" id="login-password" class="auth-input" placeholder="Kata sandi" autocomplete="current-password">
+                    <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-pressed="false" aria-controls="login-password" onclick="togglePasswordVisibility('login-password', this)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path class="password-eye-slash" d="m3 3 18 18"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p id="login-error" class="auth-error" role="alert" aria-live="assertive" hidden></p>
+                <div class="auth-buttons">
+                    <button class="btn btn-primary" onclick="login()">MASUK</button>
+                    <button class="auth-link" onclick="showForgot()">Lupa kata sandi?</button>
+                </div>
+            </div>
+            <div id="forgot-form" class="hidden">
+                <p style="font-size:0.8rem; margin-bottom:4px;">Untuk mengatur ulang kata sandi, hubungi pengelola akun.</p>
+                <button class="auth-link" onclick="showLogin()">Kembali ke Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROFIL MODAL -->
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title">PROFIL SAYA</div>
+            <div class="profile-info">
+                <!-- FOTO PROFIL DEFAULT MENGGUNAKAN LOGO UD. CHARLES -->
+                <img id="profile-photo" class="profile-photo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj48Y2lyY2xlIGN4PSIyNTAiIGN5PSIyNTAiIHI9IjI0MCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMWExYTFhIiBzdHJva2Utd2lkdGg9IjEyIi8+PGNpcmNsZSBjeD0iMjUwIiBjeT0iMjUwIiByPSIyMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q0YWYzNyIgc3Ryb2tlLXdpZHRoPSI4Ii8+PHBhdGggZD0iTSAyNzAgMTQwIEMgMTgwIDE0MCAxNTAgMjAwIDE1MCAyNTAgQyAxNTAgMzIwIDIwMCAzNjAgMjcwIDM2MCBDIDMwMCAzNjAgMzIwIDM1MCAzMzAgMzQwIEwgMzEwIDMwMCBDIDI5NSAzMTAgMjgwIDMxNSAyNjAgMzE1IEMgMjIwIDMxNSAxOTUgMjkwIDE5NSAyNTAgQyAxOTUgMjEwIDIyMCAxODUgMjYwIDE4NSBDIDI4MCAxODUgMjk1IDE5MCAzMTAgMjAwIEwgMzMwIDE2MCBDIDMxMCAxNDUgMjkwIDE0MCAyNzAgMTQwIFoiIGZpbGw9IiMxYTFhMWEiLz48cGF0aCBkPSJNIDE0MCAyNTAgUSAyNTAgMTgwIDM4MCAyMzAgUSAyODAgMjgwIDE0MCAyNTAgWiIgZmlsbD0iI2Q0YWYzNyIvPjx0ZXh0IHg9IjI1MCIgeT0iMzcwIiBmb250LWZhbWlseT0iR2VvcmdpYSwgc2VyaWYiIGZvbnQtc2l6ZT0iNjUiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjMWExYTFhIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBsZXR0ZXItc3BhY2luZz0iMiI+VUQuIENIQVJMRVM8L3RleHQ+PGxpbmUgeDE9IjgwIiB5MT0iNDAwIiB4Mj0iMTgwIiB5Mj0iNDAwIiBzdHJva2U9IiNkNGFmMzciIHN0cm9rZS13aWR0aD0iMTAiLz48bGluZSB4MT0iMzIwIiB5MT0iNDAwIiB4Mj0iNDIwIiB5Mj0iNDAwIiBzdHJva2U9IiNkNGFmMzciIHN0cm9rZS13aWR0aD0iMTAiLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLCAxMCkiPjxwYXRoIGQ9Ik0gMjEwIDQyMCBMIDI5MCA0MjAgTCAyODAgNDUwIEwgMjIwIDQ1MCBaIiBmaWxsPSJub25lIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iOCIvPjxsaW5lIHgxPSIyMDAiIHkxPSI0MTAiIHgyPSIyMTAiIHkyPSI0MjAiIHN0cm9rZT0iIzFhMWExYSIgc3Ryb2tlLXdpZHRoPSI4Ii8+PGNpcmNsZSBjeD0iMjM1IiBjeT0iNDcwIiByPSIxMiIgZmlsbD0iIzFhMWExYSIvPjxjaXJjbGUgY3g9IjI2NSIgY3k9IjQ3MCIgcj0iMTIiIGZpbGw9IiMxYTFhMWEiLz48L2c+PC9zdmc+" alt="Foto Profil">
+                <div style="text-align: center; margin-bottom: 4px;">
+                    <button class="btn btn-secondary btn-xs" onclick="document.getElementById('upload-photo').click()">GANTI FOTO</button>
+                    <input type="file" id="upload-photo" accept="image/*" style="display: none;">
+                </div>
+                <label>Nama:</label>
+                <input type="text" id="edit-nama" class="auth-input" placeholder="Nama">
+                <label>Email akun:</label>
+                <input type="email" id="edit-username" class="auth-input" readonly>
+                <label>Kata sandi baru (opsional):</label>
+                <input type="password" id="edit-password" class="auth-input" placeholder="Kosongkan jika tidak diganti" autocomplete="new-password">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="saveProfile()">SIMPAN</button>
+                <button class="btn btn-danger" onclick="logout()">KELUAR</button>
+                <button class="btn btn-secondary" onclick="closeProfile()">TUTUP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PINDAH DRAFT -->
+    <div id="move-draft-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title">Pindahkan NIK</div>
+            <div class="modal-body" id="move-draft-message">Pilih tujuan:</div>
+            <div class="modal-actions" id="move-draft-actions"></div>
+        </div>
+    </div>
+
+    <!-- MODAL INFO DROPDOWN (detail) -->
+    <div id="info-detail-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title" id="info-detail-title">Informasi Data</div>
+            <div id="info-detail-body" class="modal-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('info-detail-modal').classList.add('hidden')">TUTUP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === FITUR BARU: MODAL PILIH WARNA === -->
+    <div id="color-picker-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 300px;">
+            <div class="modal-title">Pilih Warna Penanda</div>
+            <div class="color-picker-grid">
+                <button class="color-choice color-red" type="button" onclick="applyColor('#ef4444')" title="Merah" aria-label="Pilih warna merah"></button>
+                <button class="color-choice color-yellow" type="button" onclick="applyColor('#f59e0b')" title="Kuning" aria-label="Pilih warna kuning"></button>
+                <button class="color-choice color-green" type="button" onclick="applyColor('#10b981')" title="Hijau" aria-label="Pilih warna hijau"></button>
+                <button class="color-choice color-default" type="button" onclick="applyColor('')" title="Hapus Warna" aria-label="Hapus warna penanda"></button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('color-picker-modal').classList.add('hidden')">BATAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === FITUR BARU: MODAL EKSPOR === -->
+    <div id="export-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 350px;">
+            <div class="modal-title">Pilih Data yang Diekspor</div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn btn-primary" onclick="processExport('all')">SELURUH DATA</button>
+                <button class="btn btn-secondary" onclick="processExport('main')">DAFTAR UTAMA</button>
+                <button class="btn btn-secondary" onclick="processExport('draft1')">DRAFT 1</button>
+                <button class="btn btn-secondary" onclick="processExport('draft2')">DRAFT 2</button>
+                <button class="btn btn-warning" onclick="processExport('notes')">CATATAN BELANJA</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('export-modal').classList.add('hidden')">TUTUP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === FITUR BARU: MODAL TRASH SAMPAH === -->
+    <div id="trash-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title">DRAFT SAMPAH (Maks. 10)</div>
+            <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="trash-list-container" class="trash-list">
+                    <!-- Diisi oleh JS -->
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('trash-modal').classList.add('hidden')">TUTUP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-main" class="hidden">
+        <h1 class="header-title">
+            <span class="header-brand">UD. CHARLES</span>
+            <span class="header-actions">
+                <button id="dark-mode-toggle" class="dark-mode-toggle" type="button" aria-label="Ubah tema warna" aria-pressed="false" title="Ubah tema warna">
+                    <span class="theme-switch" aria-hidden="true">
+                        <span class="theme-switch-knob">
+                            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                                <circle cx="12" cy="12" r="3.5"></circle>
+                                <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>
+                            </svg>
+                            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"></path>
+                            </svg>
+                        </span>
+                    </span>
+                </button>
+                <button id="profile-btn" class="profile-btn" type="button" title="Profil">PROFIL</button>
+            </span>
+        </h1>
+
+        <div class="mode-controls">
+            <button id="btn-mode-salin" class="btn btn-primary btn-active" onclick="switchMode('SALIN')">SALIN NIK</button>
+            <button id="btn-mode-edit" class="btn btn-secondary" onclick="switchMode('EDIT')">EDIT NIK</button>
+        </div>
+
+        <!-- CATATAN PENJUALAN -->
+        <div class="card">
+            <div class="card-title">CATATAN PENJUALAN</div>
+            <div class="notes-form">
+                <input type="number" id="note-awal" placeholder="AWAL (No)" min="1">
+                <input type="number" id="note-akhir" placeholder="AKHIR (No)" min="1">
+                <button class="btn btn-primary btn-action-sm" onclick="saveSalesNote()">SIMPAN</button>
+                <button class="btn btn-danger btn-action-sm" onclick="promptResetNotes()">RESET</button>
+            </div>
+            <div class="table-container">
+                <table class="sales-table">
+                    <thead><tr><th>NO</th><th>AWAL</th><th>AKHIR</th><th>TANGGAL</th><th>AKSI</th></tr></thead>
+                    <tbody id="sales-notes-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PENCARIAN & STATISTIK -->
+        <div class="card">
+            <div class="search-box">
+                <div class="search-grid">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-nik-input" placeholder="Cari NIK / No..." oninput="handleSearch()">
+                        <button id="quick-add-btn" class="quick-add-btn" disabled title="Tambah NIK baru">+</button>
+                    </div>
+                    <input type="text" id="search-detail-input" placeholder="Cari Tempat / Tanggal..." oninput="handleSearch()">
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">TOTAL</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-copied">0</div><div class="stat-lbl">TERSALIN</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-remaining">0</div><div class="stat-lbl">BELUM</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-view-label">UTAMA</div><div class="stat-lbl">VIEW</div></div>
+            </div>
+        </div>
+
+        <!-- DAFTAR NIK + DRAFT LACI -->
+        <div class="card">
+            <div class="card-title" id="nik-list-title">
+                <span id="nik-title-text">
+                    <span class="nik-title-icon mode-salin" id="nik-title-icon">S</span>
+                    DAFTAR NIK
+                </span>
+                <span class="card-title-right">
+                    <button id="draft-toggle-btn" class="draft-toggle-btn" onclick="toggleDraftLaci()" title="Buka/Tutup Draft">
+                    <span class="arrow" id="draft-arrow">▾</span>
+                    </button>
+                    <div class="info-dropdown">
+                    <button id="info-dropdown-btn" class="info-dropdown-btn" onclick="toggleInfoDropdown()">INFO</button>
+                        <div id="info-dropdown-content" class="info-dropdown-content">
+                            <button onclick="showInfoDetail('keseluruhan')">Keseluruhan</button>
+                            <button onclick="showInfoDetail('utama')">Utama</button>
+                            <button onclick="showInfoDetail('draft1')">Draft 1</button>
+                            <button onclick="showInfoDetail('draft2')">Draft 2</button>
+                            <!-- FITUR BARU: TOMBOL SAMPAH -->
+                            <button class="btn-trash" onclick="openTrashModal()">Sampah</button>
+                        </div>
+                    </div>
+                </span>
+            </div>
+
+            <!-- LACI DRAFT -->
+            <div id="draft-laci" class="draft-laci">
+                <div class="draft-laci-inner">
+                    <button id="btn-draft1" class="btn btn-secondary" onclick="switchDraftView('draft1')">DRAFT 1</button>
+                    <button id="btn-draft2" class="btn btn-secondary" onclick="switchDraftView('draft2')">DRAFT 2</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead><tr><th style="width: 30px;">NO</th><th>NIK</th><th style="width: 1%; text-align: center;">AKSI</th></tr></thead>
+                    <tbody id="nik-table-body"></tbody>
+                </table>
+            </div>
+            <div id="add-nik-container" class="hidden" style="margin-top: 6px;">
+                <button class="btn btn-success" style="width:100%;" onclick="addNewNikRow()">+ TAMBAHKAN NIK BARU</button>
+            </div>
+            <div id="delete-all-container" class="hidden" style="margin-top: 6px;">
+                <button class="btn btn-danger" style="width:100%;" onclick="promptDeleteAllNik()">HAPUS SEMUA NIK</button>
+            </div>
+        </div>
+
+        <!-- ALAT DATA -->
+        <div class="card">
+            <div class="card-title">ALAT DATA</div>
+            <div class="data-tools">
+                <button class="btn btn-secondary btn-action-sm" onclick="openExportModal()">EXPORT JSON</button>
+                <button class="btn btn-secondary btn-action-sm" onclick="document.getElementById('import-file').click()">IMPORT JSON</button>
+                <input type="file" id="import-file" accept=".json" style="display: none" onchange="importData(event)">
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION CONTAINER -->
+    <div id="notification-container"></div>
+
+    <!-- MODAL CONFIRMATION -->
+    <div id="modal-confirm" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title">Konfirmasi</div>
+            <div class="modal-body" id="modal-message">Apakah Anda yakin?</div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary btn-action-sm" onclick="closeModal()">BATAL</button>
+                <button class="btn btn-danger btn-action-sm" id="modal-btn-confirm">YA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- JAVASCRIPT -->
+    <!-- ============================================================ -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="supabase-config.js" defer></script>
+    <script src="app.js" defer></script>
+</body>
+</html>
