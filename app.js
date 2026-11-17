@@ -76,11 +76,27 @@
         function showAuth() {
             document.getElementById('auth-screen').classList.remove('hidden');
             document.getElementById('app-main').classList.add('hidden');
+            updateBackToTopVisibility();
         }
 
         function showApp() {
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('app-main').classList.remove('hidden');
+            updateBackToTopVisibility();
+        }
+
+        function updateBackToTopVisibility() {
+            const button = document.getElementById('back-to-top');
+            const appVisible = !document.getElementById('app-main').classList.contains('hidden');
+            const isVisible = appVisible && window.scrollY > 500;
+            button.classList.toggle('is-visible', isVisible);
+            button.setAttribute('aria-hidden', String(!isVisible));
+            button.tabIndex = isVisible ? 0 : -1;
+        }
+
+        function scrollToTop() {
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
         }
 
         function showLogin() {
@@ -875,6 +891,9 @@
                 updateProfileUI();
                 document.getElementById('profile-modal').classList.remove('hidden');
             });
+            window.addEventListener('scroll', updateBackToTopVisibility, { passive: true });
+            document.getElementById('back-to-top').addEventListener('click', scrollToTop);
+            updateBackToTopVisibility();
             document.getElementById('upload-photo').addEventListener('change', uploadProfilePhoto);
             const profileCropViewport = document.getElementById('profile-crop-viewport');
             profileCropViewport.addEventListener('pointerdown', startProfileCropDrag);
@@ -1054,22 +1073,23 @@
         }
 
         function toggleDraftLaci() {
-            appState.draftOpen = !appState.draftOpen;
-            const laci = document.getElementById('draft-laci');
-            const arrow = document.getElementById('draft-arrow');
-            if (appState.draftOpen) {
-                laci.classList.add('open');
-                arrow.textContent = '▼';
-                arrow.classList.add('open');
-            } else {
-                laci.classList.remove('open');
-                arrow.textContent = '▶';
-                arrow.classList.remove('open');
-            }
+            setDraftLaciOpen(!appState.draftOpen);
             if (!appState.draftOpen && appState.currentView !== 'main' && appState.currentView !== 'search') {
                 appState.currentView = 'main';
                 renderAll();
             }
+        }
+
+        function setDraftLaciOpen(isOpen) {
+            appState.draftOpen = isOpen;
+            const laci = document.getElementById('draft-laci');
+            const arrow = document.getElementById('draft-arrow');
+            const button = document.getElementById('draft-toggle-btn');
+            laci.classList.toggle('open', isOpen);
+            arrow.classList.toggle('open', isOpen);
+            button.setAttribute('aria-expanded', String(isOpen));
+            button.setAttribute('aria-label', isOpen ? 'Tutup laci draft' : 'Buka laci draft');
+            button.title = isOpen ? 'Tutup laci draft' : 'Buka laci draft';
         }
 
         function switchDraftView(view) {
@@ -1078,11 +1098,7 @@
             } else {
                 appState.currentView = view;
                 if (!appState.draftOpen) {
-                    appState.draftOpen = true;
-                    document.getElementById('draft-laci').classList.add('open');
-                    const arrow = document.getElementById('draft-arrow');
-                    arrow.textContent = '▼';
-                    arrow.classList.add('open');
+                    setDraftLaciOpen(true);
                 }
             }
             document.getElementById('search-nik-input').value = '';
@@ -2056,12 +2072,20 @@
             toast.appendChild(textSpan);
             if (hasUndo && undoStack) {
                 const undoBtn = document.createElement('button');
+                undoBtn.type = 'button';
                 undoBtn.className = 'toast-undo-icon';
                 undoBtn.textContent = 'UNDO';
                 undoBtn.title = 'Urungkan';
                 undoBtn.onclick = () => { executeUndo(); toast.remove(); };
                 toast.appendChild(undoBtn);
             }
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'toast-close-btn';
+            closeBtn.textContent = '×';
+            closeBtn.setAttribute('aria-label', 'Tutup notifikasi');
+            closeBtn.addEventListener('click', () => toast.remove());
+            toast.appendChild(closeBtn);
             container.appendChild(toast);
             setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
         }
