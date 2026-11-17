@@ -36,7 +36,18 @@
         // 2. AUTH & USER MANAGEMENT
         // ============================================================
         const PROFILE_PHOTO_KEY = 'NIK_GAS_LPG_PROFILE_PHOTO_V1';
+        const PROFILE_PHOTO_BUCKET = 'nik-gas-lpg-profile-photos';
+        const PROFILE_PHOTO_TABLE = 'user_profile_photos';
         const PROFILE_PHOTO_SIZE = 512;
+        const PROFILE_PHOTO_DEFAULT_SRC = document.getElementById('profile-photo').getAttribute('src');
+        let profilePhotoCurrent = null;
+        let profilePhotoInitial = null;
+        let profilePhotoDraft = null;
+        let profileOriginalName = '';
+        let profilePhotoVersion = null;
+        let profilePhotoChannel = null;
+        let profilePhotoLoadSequence = 0;
+        let profileSaveInProgress = false;
         let profileCropImage = null;
         let profileCropObjectUrl = null;
         let profileCropZoom = 1;
@@ -154,6 +165,18 @@
         }
 
         async function logout() {
+            if (profileSaveInProgress) return;
+            if (profileHasUnsavedChanges()) {
+                showModal('Ada perubahan profil yang belum disimpan. Buang perubahan dan tetap keluar?', () => {
+                    discardProfileChanges();
+                    performLogout();
+                });
+                return;
+            }
+            await performLogout();
+        }
+
+        async function performLogout() {
             if (!supabaseClient) return;
             try {
                 await cloudSyncQueue;
@@ -174,7 +197,15 @@
                 await supabaseClient.removeChannel(cloudRealtimeChannel);
                 cloudRealtimeChannel = null;
             }
-            closeProfile();
+            if (profilePhotoChannel) {
+                await supabaseClient.removeChannel(profilePhotoChannel);
+                profilePhotoChannel = null;
+            }
+            profilePhotoCurrent = null;
+            profilePhotoInitial = null;
+            profilePhotoDraft = null;
+            profilePhotoVersion = null;
+            hideProfileModal();
             showAuth();
             showNotification('Anda telah keluar');
         }
@@ -182,38 +213,298 @@
         function updateProfileUI() {
             if (!currentUser) return;
             const metadata = currentUser.user_metadata || {};
-            document.getElementById('edit-nama').value = metadata.display_name || 'UD. CHARLES';
+            profileOriginalName = metadata.display_name || 'UD. CHARLES';
+            document.getElementById('edit-nama').value = profileOriginalName;
             document.getElementById('edit-username').value = currentUser.email || '';
             document.getElementById('edit-password').value = '';
-            const savedPhoto = localStorage.getItem(PROFILE_PHOTO_KEY);
-            if (savedPhoto) document.getElementById('profile-photo').src = savedPhoto;
+            if (profilePhotoCurrent === null) {
+                profilePhotoCurrent = readProfilePhotoCache(currentUser.id);
+            }
+            profilePhotoInitial = profilePhotoCurrent;
+            profilePhotoDraft = profilePhotoCurrent;
+            setProfilePhotoPreview(profilePhotoDraft);
         }
 
-        async function saveProfile() {
-            if (!currentUser || !supabaseClient) return;
+        function profileHasUnsavedChanges() {
+            if (!currentUser || document.getElementById('profile-modal').classList.contains('hidden')) return false;
+            return document.getElementById('edit-nama').value.trim() !== profileOriginalName ||
+                document.getElementById('edit-password').value !== '' ||
+                profilePhotoDraft !== profilePhotoInitial;
+        }
+
+        function saveProfile() {
+            if (!currentUser || !supabaseClient || profileSaveInProgress) return;
             const displayName = document.getElementById('edit-nama').value.trim();
-            const password = document.getElementById('edit-password').value;
             if (!displayName) {
                 showNotification('Nama wajib diisi.');
                 return;
             }
-            const updates = {
-                data: { ...(currentUser.user_metadata || {}), display_name: displayName }
-            };
-            if (password) updates.password = password;
+            if (!profileHasUnsavedChanges()) {
+                showNotification('Tidak ada perubahan profil untuk disimpan.');
+                return;
+            }
+            showModal('Simpan perubahan profil sekarang?', saveProfileConfirmed);
+        }
+
+        function setProfileSaveControlsDisabled(disabled) {
+            [
+                'edit-nama',
+                'edit-password',
+                'upload-photo',
+                'profile-change-photo-btn',
+                'profile-save-btn',
+                'profile-logout-btn',
+                'profile-close-btn'
+            ].forEach((id) => {
+                document.getElementById(id).disabled = disabled;
+            });
+        }
+
+        async function saveProfileConfirmed() {
+            if (!currentUser || !supabaseClient || profileSaveInProgress) return;
+            const displayName = document.getElementById('edit-nama').value.trim();
+            const password = document.getElementById('edit-password').value;
+            const photoChanged = profilePhotoDraft !== profilePhotoInitial;
+            const photoData = profilePhotoDraft;
+            let authChangesSaved = false;
+            profileSaveInProgress = true;
+            setProfileSaveControlsDisabled(true);
             try {
-                const { data, error } = await supabaseClient.auth.updateUser(updates);
-                if (error) {
-                    showNotification(`Profil gagal disimpan: ${error.message}`);
+                if (displayName !== profileOriginalName || password) {
+                    const updates = {
+                        data: { ...(currentUser.user_metadata || {}), display_name: displayName }
+                    };
+                    if (password) updates.password = password;
+                    const { data, error } = await supabaseClient.auth.updateUser(updates);
+                    if (error) throw error;
+                    currentUser = data.user;
+                    profileOriginalName = displayName;
+                    document.getElementById('edit-password').value = '';
+                    authChangesSaved = true;
+                }
+
+                if (photoChanged) {
+                    profilePhotoVersion = await uploadProfilePhotoToCloud(currentUser, photoData);
+                    profilePhotoCurrent = photoData;
+                    profilePhotoInitial = photoData;
+                    cacheProfilePhoto(currentUser.id, photoData);
+                    setProfilePhotoPreview(photoData);
+                }
+
+                showNotification(photoChanged
+                    ? 'Profil berhasil disimpan dan foto tersinkron ke perangkat lain.'
+                    : 'Profil berhasil disimpan');
+            } catch (error) {
+                console.error('Gagal menyimpan perubahan profil:', error);
+                const message = authChangesSaved
+                    ? `Nama atau kata sandi berhasil disimpan, tetapi foto gagal disinkronkan: ${error.message}`
+                    : `Profil gagal disimpan: ${error.message}`;
+                showNotification(message);
+            } finally {
+                profileSaveInProgress = false;
+                setProfileSaveControlsDisabled(false);
+            }
+        }
+
+        function closeProfile() {
+            if (profileSaveInProgress) return;
+            if (profileHasUnsavedChanges()) {
+                showModal('Buang perubahan profil yang belum disimpan?', () => {
+                    discardProfileChanges();
+                    hideProfileModal();
+                });
+                return;
+            }
+            hideProfileModal();
+        }
+
+        function discardProfileChanges() {
+            if (profileCropImage) cancelProfileCrop();
+            document.getElementById('edit-nama').value = profileOriginalName;
+            document.getElementById('edit-password').value = '';
+            profilePhotoInitial = profilePhotoCurrent;
+            profilePhotoDraft = profilePhotoCurrent;
+            setProfilePhotoPreview(profilePhotoCurrent);
+        }
+
+        function hideProfileModal() {
+            if (profileCropImage) cancelProfileCrop();
+            document.getElementById('profile-modal').classList.add('hidden');
+        }
+
+        function profilePhotoCacheKey(userId) {
+            return `${PROFILE_PHOTO_KEY}_${userId}`;
+        }
+
+        function readProfilePhotoCache(userId) {
+            try {
+                return localStorage.getItem(profilePhotoCacheKey(userId)) ||
+                    localStorage.getItem(PROFILE_PHOTO_KEY) ||
+                    null;
+            } catch (error) {
+                console.error('Gagal membaca cache foto profil:', error);
+                showNotification('Cache foto profil di browser tidak bisa dibaca.');
+                return null;
+            }
+        }
+
+        function cacheProfilePhoto(userId, photoData) {
+            try {
+                if (photoData) {
+                    localStorage.setItem(profilePhotoCacheKey(userId), photoData);
+                } else {
+                    localStorage.removeItem(profilePhotoCacheKey(userId));
+                }
+                localStorage.removeItem(PROFILE_PHOTO_KEY);
+            } catch (error) {
+                console.error('Gagal memperbarui cache foto profil:', error);
+                showNotification('Foto profil tersimpan di cloud, tetapi cache browser tidak bisa diperbarui.');
+            }
+        }
+
+        function setProfilePhotoPreview(photoData) {
+            document.getElementById('profile-photo').src = photoData || PROFILE_PHOTO_DEFAULT_SRC;
+        }
+
+        function profilePhotoDataUrlToBlob(dataUrl) {
+            const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+            if (!match) throw new Error('Format foto lama tidak didukung. Pilih dan simpan ulang foto profil.');
+            const binary = atob(match[2]);
+            const bytes = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+                bytes[index] = binary.charCodeAt(index);
+            }
+            return new Blob([bytes], { type: match[1] });
+        }
+
+        function profilePhotoBlobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    if (typeof reader.result !== 'string') {
+                        reject(new Error('Data foto dari cloud tidak bisa dibaca.'));
+                        return;
+                    }
+                    resolve(reader.result);
+                };
+                reader.onerror = () => reject(reader.error || new Error('Data foto dari cloud tidak bisa dibaca.'));
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function uploadProfilePhotoToCloud(user, photoData) {
+            const blob = profilePhotoDataUrlToBlob(photoData);
+            const path = `${user.id}/profile`;
+            const version = Math.max(Date.now(), (profilePhotoVersion || 0) + 1);
+            const { error: uploadError } = await supabaseClient.storage
+                .from(PROFILE_PHOTO_BUCKET)
+                .upload(path, blob, {
+                    cacheControl: '0',
+                    contentType: blob.type,
+                    upsert: true
+                });
+            if (uploadError) throw uploadError;
+
+            const { error: metadataError } = await supabaseClient
+                .from(PROFILE_PHOTO_TABLE)
+                .upsert({ user_id: user.id, avatar_version: version }, { onConflict: 'user_id' });
+            if (metadataError) throw metadataError;
+            return version;
+        }
+
+        function applyCloudProfilePhoto(user, photoData, version, notifyOtherDevice) {
+            const photoChanged = profilePhotoCurrent !== photoData;
+            const profileModalOpen = !document.getElementById('profile-modal').classList.contains('hidden');
+            const hasDraftPhoto = profileModalOpen && profilePhotoDraft !== profilePhotoInitial;
+            profilePhotoCurrent = photoData;
+            profilePhotoVersion = version;
+            profilePhotoInitial = photoData;
+            if (!hasDraftPhoto) profilePhotoDraft = photoData;
+            cacheProfilePhoto(user.id, photoData);
+            setProfilePhotoPreview(profilePhotoDraft);
+            if (notifyOtherDevice && photoChanged) {
+                showNotification('Foto profil diperbarui dari perangkat lain.');
+            }
+        }
+
+        async function loadCloudProfilePhoto(user, notifyOtherDevice) {
+            const loadId = ++profilePhotoLoadSequence;
+            const { data: metadata, error: metadataError } = await supabaseClient
+                .from(PROFILE_PHOTO_TABLE)
+                .select('avatar_version')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            if (metadataError) throw metadataError;
+            if (loadId !== profilePhotoLoadSequence || !currentUser || currentUser.id !== user.id) return;
+
+            if (!metadata) {
+                const cachedPhoto = readProfilePhotoCache(user.id);
+                if (!cachedPhoto) {
+                    applyCloudProfilePhoto(user, null, null, false);
                     return;
                 }
-                currentUser = data.user;
-                updateProfileUI();
-                showNotification('Profil berhasil disimpan');
-            } catch (error) {
-                console.error('Gagal memperbarui profil Supabase:', error);
-                showNotification(`Profil gagal disimpan: ${error.message}`);
+
+                applyCloudProfilePhoto(user, cachedPhoto, null, false);
+                try {
+                    const version = await uploadProfilePhotoToCloud(user, cachedPhoto);
+                    if (loadId !== profilePhotoLoadSequence || !currentUser || currentUser.id !== user.id) return;
+                    applyCloudProfilePhoto(user, cachedPhoto, version, false);
+                    showNotification('Foto profil lama berhasil disinkronkan.');
+                } catch (error) {
+                    console.error('Gagal memigrasikan foto profil ke cloud:', error);
+                    showNotification(`Foto profil belum tersinkron. Jalankan supabase/profile_photos.sql di Supabase: ${error.message}`);
+                }
+                return;
             }
+
+            const { data: photoBlob, error: downloadError } = await supabaseClient.storage
+                .from(PROFILE_PHOTO_BUCKET)
+                .download(`${user.id}/profile`);
+            if (downloadError) throw downloadError;
+            const photoData = await profilePhotoBlobToDataUrl(photoBlob);
+            if (loadId !== profilePhotoLoadSequence || !currentUser || currentUser.id !== user.id) return;
+            applyCloudProfilePhoto(user, photoData, metadata.avatar_version, notifyOtherDevice);
+        }
+
+        async function initializeProfilePhoto(user) {
+            try {
+                await loadCloudProfilePhoto(user, false);
+            } catch (error) {
+                console.error('Gagal memuat foto profil dari Supabase:', error);
+                const cachedPhoto = readProfilePhotoCache(user.id);
+                applyCloudProfilePhoto(user, cachedPhoto, null, false);
+                showNotification(`Sinkronisasi foto profil gagal. Pastikan supabase/profile_photos.sql sudah dijalankan: ${error.message}`);
+            }
+        }
+
+        function subscribeToProfilePhotoChanges(userId) {
+            if (profilePhotoChannel) {
+                supabaseClient.removeChannel(profilePhotoChannel);
+                profilePhotoChannel = null;
+            }
+            profilePhotoChannel = supabaseClient
+                .channel(`profile-photo:${userId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: PROFILE_PHOTO_TABLE,
+                    filter: `user_id=eq.${userId}`
+                }, (payload) => {
+                    const metadata = payload.new;
+                    if (!metadata || !metadata.avatar_version ||
+                        metadata.avatar_version === profilePhotoVersion) return;
+                    if (!currentUser) return;
+                    loadCloudProfilePhoto(currentUser, true).catch((error) => {
+                        console.error('Gagal memperbarui foto profil dari Realtime:', error);
+                        showNotification(`Foto profil dari perangkat lain gagal dimuat: ${error.message}`);
+                    });
+                })
+                .subscribe((status) => {
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        console.error(`Realtime foto profil gagal: ${status}`);
+                        showNotification('Sinkronisasi langsung foto profil belum aktif. Periksa pengaturan Realtime di Supabase.');
+                    }
+                });
         }
 
         function uploadProfilePhoto(event) {
@@ -316,6 +607,14 @@
             releaseProfileCropImage();
         }
 
+        function requestCancelProfileCrop() {
+            if (!profileCropImage) {
+                cancelProfileCrop();
+                return;
+            }
+            showModal('Batalkan pemilihan foto profil ini?', cancelProfileCrop);
+        }
+
         function saveProfileCrop() {
             if (!profileCropImage) return;
             updateProfileCropPreview();
@@ -362,8 +661,8 @@
                     PROFILE_PHOTO_SIZE
                 );
                 const photoData = canvas.toDataURL('image/jpeg', 0.82);
-                localStorage.setItem(PROFILE_PHOTO_KEY, photoData);
-                document.getElementById('profile-photo').src = photoData;
+                profilePhotoDraft = photoData;
+                setProfilePhotoPreview(profilePhotoDraft);
             } catch (error) {
                 console.error('Gagal memotong atau menyimpan foto profil:', error);
                 showNotification('Foto gagal disimpan. Coba gambar lain.');
@@ -371,12 +670,7 @@
             }
 
             cancelProfileCrop();
-            showNotification('Foto profil disimpan di browser ini saja.');
-        }
-
-        function closeProfile() {
-            if (profileCropImage) cancelProfileCrop();
-            document.getElementById('profile-modal').classList.add('hidden');
+            showNotification('Potongan foto siap disimpan. Tekan SIMPAN untuk menerapkan perubahan.');
         }
         // 3. PENYIMPANAN DATA (AGAR TERSIMPAN PERMANEN)
         // ============================================================
@@ -803,6 +1097,13 @@
         }
 
         async function handleAuthenticatedUser(user) {
+            if (!currentUser || currentUser.id !== user.id) {
+                profilePhotoLoadSequence += 1;
+                profilePhotoCurrent = readProfilePhotoCache(user.id);
+                profilePhotoInitial = profilePhotoCurrent;
+                profilePhotoDraft = profilePhotoCurrent;
+                profilePhotoVersion = null;
+            }
             currentUser = user;
             cloudSyncReady = false;
             try {
@@ -836,6 +1137,11 @@
                 }
                 subscribeToCloudChanges();
                 updateProfileUI();
+                subscribeToProfilePhotoChanges(user.id);
+                initializeProfilePhoto(user).catch((error) => {
+                    console.error('Gagal menyiapkan sinkronisasi foto profil:', error);
+                    showNotification(`Sinkronisasi foto profil gagal: ${error.message}`);
+                });
                 renderAll();
                 showApp();
                 showNotification(`Selamat datang, ${currentUser.email}`);

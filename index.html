@@ -47,7 +47,7 @@
                 <!-- FOTO PROFIL DEFAULT MENGGUNAKAN LOGO UD. CHARLES -->
                 <img id="profile-photo" class="profile-photo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj48Y2lyY2xlIGN4PSIyNTAiIGN5PSIyNTAiIHI9IjI0MCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMWExYTFhIiBzdHJva2Utd2lkdGg9IjEyIi8+PGNpcmNsZSBjeD0iMjUwIiBjeT0iMjUwIiByPSIyMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q0YWYzNyIgc3Ryb2tlLXdpZHRoPSI4Ii8+PHBhdGggZD0iTSAyNzAgMTQwIEMgMTgwIDE0MCAxNTAgMjAwIDE1MCAyNTAgQyAxNTAgMzIwIDIwMCAzNjAgMjcwIDM2MCBDIDMwMCAzNjAgMzIwIDM1MCAzMzAgMzQwIEwgMzEwIDMwMCBDIDI5NSAzMTAgMjgwIDMxNSAyNjAgMzE1IEMgMjIwIDMxNSAxOTUgMjkwIDE5NSAyNTAgQyAxOTUgMjEwIDIyMCAxODUgMjYwIDE4NSBDIDI4MCAxODUgMjk1IDE5MCAzMTAgMjAwIEwgMzMwIDE2MCBDIDMxMCAxNDUgMjkwIDE0MCAyNzAgMTQwIFoiIGZpbGw9IiMxYTFhMWEiLz48cGF0aCBkPSJNIDE0MCAyNTAgUSAyNTAgMTgwIDM4MCAyMzAgUSAyODAgMjgwIDE0MCAyNTAgWiIgZmlsbD0iI2Q0YWYzNyIvPjx0ZXh0IHg9IjI1MCIgeT0iMzcwIiBmb250LWZhbWlseT0iR2VvcmdpYSwgc2VyaWYiIGZvbnQtc2l6ZT0iNjUiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjMWExYTFhIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBsZXR0ZXItc3BhY2luZz0iMiI+VUQuIENIQVJMRVM8L3RleHQ+PGxpbmUgeDE9IjgwIiB5MT0iNDAwIiB4Mj0iMTgwIiB5Mj0iNDAwIiBzdHJva2U9IiNkNGFmMzciIHN0cm9rZS13aWR0aD0iMTAiLz48bGluZSB4MT0iMzIwIiB5MT0iNDAwIiB4Mj0iNDIwIiB5Mj0iNDAwIiBzdHJva2U9IiNkNGFmMzciIHN0cm9rZS13aWR0aD0iMTAiLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLCAxMCkiPjxwYXRoIGQ9Ik0gMjEwIDQyMCBMIDI5MCA0MjAgTCAyODAgNDUwIEwgMjIwIDQ1MCBaIiBmaWxsPSJub25lIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iOCIvPjxsaW5lIHgxPSIyMDAiIHkxPSI0MTAiIHgyPSIyMTAiIHkyPSI0MjAiIHN0cm9rZT0iIzFhMWExYSIgc3Ryb2tlLXdpZHRoPSI4Ii8+PGNpcmNsZSBjeD0iMjM1IiBjeT0iNDcwIiByPSIxMiIgZmlsbD0iIzFhMWExYSIvPjxjaXJjbGUgY3g9IjI2NSIgY3k9IjQ3MCIgcj0iMTIiIGZpbGw9IiMxYTFhMWEiLz48L2c+PC9zdmc+" alt="Foto Profil">
                 <div style="text-align: center; margin-bottom: 4px;">
-                    <button class="btn btn-secondary btn-xs" onclick="document.getElementById('upload-photo').click()">GANTI FOTO</button>
+                    <button id="profile-change-photo-btn" class="btn btn-secondary btn-xs" onclick="document.getElementById('upload-photo').click()">GANTI FOTO</button>
                     <input type="file" id="upload-photo" class="profile-photo-file" accept="image/*" aria-label="Pilih foto profil">
                 </div>
                 <label>Nama:</label>
@@ -58,9 +58,9 @@
                 <input type="password" id="edit-password" class="auth-input" placeholder="Kosongkan jika tidak diganti" autocomplete="new-password">
             </div>
             <div class="modal-actions">
-                <button class="btn btn-primary" onclick="saveProfile()">SIMPAN</button>
-                <button class="btn btn-danger" onclick="logout()">KELUAR</button>
-                <button class="btn btn-secondary" onclick="closeProfile()">TUTUP</button>
+                <button id="profile-save-btn" class="btn btn-primary" onclick="saveProfile()">SIMPAN</button>
+                <button id="profile-logout-btn" class="btn btn-danger" onclick="logout()">KELUAR</button>
+                <button id="profile-close-btn" class="btn btn-secondary" onclick="closeProfile()">TUTUP</button>
             </div>
         </div>
     </div>
@@ -77,7 +77,7 @@
                 <input type="range" id="profile-crop-zoom" min="1" max="3" step="0.01" value="1">
             </div>
             <div class="modal-actions profile-crop-actions">
-                <button class="btn btn-secondary" type="button" onclick="cancelProfileCrop()">BATAL</button>
+                <button class="btn btn-secondary" type="button" onclick="requestCancelProfileCrop()">BATAL</button>
                 <button class="btn btn-primary" type="button" onclick="saveProfileCrop()">SIMPAN FOTO</button>
             </div>
         </div>
