@@ -684,6 +684,7 @@
         let cloudSyncQueue = Promise.resolve();
         let cloudRealtimeChannel = null;
         let cloudRefreshTimer = null;
+        let cloudRefreshPending = false;
 
         function normalizeNikRecord(item) {
             const record = typeof item === 'string' ? { nik: item } : item;
@@ -1075,7 +1076,12 @@
         }
 
         async function refreshCloudData() {
-            if (!cloudSyncReady || !currentUser || appState.mode === 'EDIT' || appState.addingNew) return;
+            if (!cloudSyncReady || !currentUser) return;
+            if (appState.mode === 'EDIT' || appState.addingNew) {
+                cloudRefreshPending = true;
+                return;
+            }
+            cloudRefreshPending = false;
             try {
                 await cloudSyncQueue;
                 if (!cloudSnapshotsEqual(createCloudSnapshotFromState(), cloudSyncBaseline)) return;
@@ -1099,6 +1105,7 @@
         async function handleAuthenticatedUser(user) {
             if (!currentUser || currentUser.id !== user.id) {
                 profilePhotoLoadSequence += 1;
+                cloudRefreshPending = false;
                 profilePhotoCurrent = readProfilePhotoCache(user.id);
                 profilePhotoInitial = profilePhotoCurrent;
                 profilePhotoDraft = profilePhotoCurrent;
@@ -1376,6 +1383,7 @@
             }
             updateModeIcon();
             renderAll();
+            if (newMode === 'SALIN' && cloudRefreshPending) scheduleCloudRefresh();
         }
 
         function toggleDraftLaci() {
@@ -2324,9 +2332,12 @@
         function saveSalesNote() {
             const awalInput = document.getElementById('note-awal');
             const akhirInput = document.getElementById('note-akhir');
-            const awal = parseInt(awalInput.value, 10);
-            const akhir = parseInt(akhirInput.value, 10);
-            if (isNaN(awal) || isNaN(akhir)) { showNotification('Input tidak valid: harus angka'); return; }
+            const awal = Number(awalInput.value);
+            const akhir = Number(akhirInput.value);
+            if (!Number.isSafeInteger(awal) || !Number.isSafeInteger(akhir)) {
+                showNotification('Input tidak valid: masukkan angka bulat.');
+                return;
+            }
             if (awal < 1 || akhir < 1) { showNotification('Nomor tidak boleh kurang dari 1'); return; }
             const now = new Date();
             const dd = String(now.getDate()).padStart(2, '0');
@@ -2377,12 +2388,14 @@
             textSpan.textContent = message;
             toast.appendChild(textSpan);
             if (hasUndo && undoStack) {
+                const actionToUndo = undoStack;
+                container.querySelectorAll('.toast-undo-icon').forEach(button => button.remove());
                 const undoBtn = document.createElement('button');
                 undoBtn.type = 'button';
                 undoBtn.className = 'toast-undo-icon';
                 undoBtn.textContent = 'UNDO';
                 undoBtn.title = 'Urungkan';
-                undoBtn.onclick = () => { executeUndo(); toast.remove(); };
+                undoBtn.onclick = () => { executeUndo(actionToUndo); toast.remove(); };
                 toast.appendChild(undoBtn);
             }
             const closeBtn = document.createElement('button');
@@ -2396,9 +2409,8 @@
             setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
         }
 
-        function executeUndo() {
-            if (!undoStack) return;
-            const action = undoStack;
+        function executeUndo(action = undoStack) {
+            if (!action || undoStack !== action) return;
             undoStack = null;
             switch (action.type) {
                 case 'DELETE_NIK': {
